@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, User, KeyRound, Music, Clock } from 'lucide-react';
+import { Sparkles, User, Clock } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNox } from '../context/NoxContext';
 import { useNavigate } from 'react-router-dom';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
 
+console.log('BOOT-70: REAL Login.jsx EXECUTING');
+
 export function Login() {
+  console.log('BOOT-71: Login RENDER START');
   const { login, user } = useAuth();
   const { config } = useNox();
   const navigate = useNavigate();
@@ -18,15 +21,24 @@ export function Login() {
 
   // Handle navigation automatically when context updates 'user'
   useEffect(() => {
-    if (user && window.location.pathname === '/login') {
+    if (user) {
+      console.log('BOOT-72: User detected, checking role for redirect:', user.role);
       const targetRole = user.role || 'cliente';
-      const routes = {
-        cliente: '/customer',
-        // Fallback or explicit routing to prevent staff lingering here if they mistakenly log in via real auth
-        ...[ 'pr', 'capo_pr', 'immagine', 'cameriere', 'admin', 'cassa', 'bodyguard', 'direzione', 'fotografo', 'cambusa' ]
-            .reduce((acc, r) => ({...acc, [r]: '/staff'}), {})
-      };
-      navigate(routes[targetRole] || '/customer');
+      
+      // If we are on a login-related page, redirect to the correct dashboard
+      const isLoginPage = ['/login', '/', '/staff', '/client-auth', '/staff-auth'].includes(window.location.pathname);
+      
+      if (isLoginPage) {
+        const routes = {
+          cliente: '/customer',
+          // Explicit mapping for staff mistakenly logging in here
+          ...[ 'pr', 'capo_pr', 'immagine', 'cameriere', 'admin', 'cassa', 'bodyguard', 'direzione', 'fotografo', 'cambusa' ]
+              .reduce((acc, r) => ({...acc, [r]: '/staff'}), {})
+        };
+        const destination = routes[targetRole] || '/customer';
+        console.log('BOOT-73: Redirecting to:', destination);
+        navigate(destination);
+      }
     }
   }, [user, navigate]);
 
@@ -86,22 +98,10 @@ export function Login() {
 
         {/* ─── PRE-PARTY "GET READY" EXPERIENCE ─── */}
         <div style={{ marginTop: '2.5rem', padding: '1rem', borderTop: '1px solid var(--border-card)', textAlign: 'center' }}>
-           <h3 style={{ fontSize: '0.9rem', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
-              <Music size={16} color="var(--accent-color)" /> {config?.clubName || 'NOX'} Experience
-           </h3>
-           <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>Preparati alla serata con la playlist ufficiale di <strong>DJ {config?.clubName || 'NOX'}</strong>.</p>
-           <a 
-            href="https://spotify.com" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            style={{ 
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.6rem',
-              background: '#1DB954', color: 'black', padding: '0.6rem', borderRadius: '30px',
-              fontSize: '0.8rem', fontWeight: 800, textDecoration: 'none'
-            }}
-           >
-             ASCOLTA SU SPOTIFY
-           </a>
+           <Sparkles size={20} color="var(--accent-color)" style={{ marginBottom: '0.75rem' }} />
+           <p style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.9)', lineHeight: 1.6, margin: '0 auto', maxWidth: '80%', fontStyle: 'italic' }}>
+             "Prova la demo, immagina già di gestire il tuo locale nel modo più comodo e facile possibile"
+           </p>
            <div style={{ marginTop: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', color: 'var(--warning)', fontSize: '0.7rem', fontWeight: 600 }}>
               <Clock size={14} /> APERTURA TRA: 02:45:12
            </div>
@@ -110,9 +110,7 @@ export function Login() {
            Password Dimenticata?
         </button>
 
-        <button onClick={() => navigate('/staff')} style={{ background: 'none', border: 'none', color: 'var(--accent-light)', width: '100%', marginTop: '1rem', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}>
-           <KeyRound size={14} /> Accesso Area Staff
-        </button>
+
       </Card>
     </div>
   );

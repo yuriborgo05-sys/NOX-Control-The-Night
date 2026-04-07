@@ -9,20 +9,25 @@ import { streamStaffMessages, sendStaffMessage, streamOrders, saveReview, record
 import { formatTime } from '../utils/formatTime';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
+import { useNoxStore } from '../store';
 
 export function ImageGirlHome() {
   const { user, logout } = useAuth();
   const { config } = useNox();
   const navigate = useNavigate();
 
-  // Chat tracking
+  const { addNotification } = useNotification();
+  const { 
+    orders: liveOrders, 
+    staffMessages: chat, 
+    isInitialSyncDone 
+  } = useNoxStore();
+
+  // Chat tracking (local UI status)
   const [isRead, setIsRead] = useState(false);
   const [replyText, setReplyText] = useState('');
-  const [chat, setChat] = useState([]);
-  const [liveOrders, setLiveOrders] = useState([]);
   const [reviewData, setReviewData] = useState({ table: '', text: '', rating: 'POSITIVA' });
   const [reviewSent, setReviewSent] = useState(false);
-  const { addNotification } = useNotification();
 
   // Guest List State
   const [activeSection, setActiveSection] = useState('operativa'); // 'operativa' | 'lista'
@@ -54,15 +59,12 @@ export function ImageGirlHome() {
   };
 
   useEffect(() => {
-    const unsubChat = streamStaffMessages((messages) => {
-      setChat(messages);
-      if (messages.length > 0 && messages[0].sender !== 'Tu') {
-        setIsRead(false);
-      }
-    });
-    const unsubOrders = streamOrders(setLiveOrders);
-    return () => { unsubChat(); unsubOrders(); };
-  }, []);
+    // Check for unread messages when store 'chat' updates
+    const lastReadId = localStorage.getItem(`nox_last_read_${user?.id}`);
+    if (chat.length > 0 && chat[0].id !== lastReadId && chat[0].sender !== 'Tu' && chat[0].sender !== user?.name) {
+      setIsRead(false);
+    }
+  }, [chat, user?.id, user?.name]);
 
   // Derive top 2 spending tables
   const topTables = liveOrders
@@ -129,17 +131,32 @@ export function ImageGirlHome() {
       
       <Card style={{ background: !isRead ? 'rgba(239, 68, 68, 0.1)' : 'var(--bg-card)', borderColor: !isRead ? 'var(--error)' : 'var(--border-card)', animation: !isRead ? 'pulse 2s infinite' : 'none' }}>
         
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem', maxHeight: '300px', overflowY: 'auto', paddingRight: '0.5rem' }}>
-           {chat.map((msg, idx) => (
-             <div key={idx} style={{ alignSelf: msg.sender === 'Tu' ? 'flex-end' : 'flex-start', background: msg.sender === 'Tu' ? 'var(--accent-color)' : 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: msg.sender === 'Tu' ? '16px 16px 0 16px' : '16px 16px 16px 0', border: msg.sender === 'Capo PR' && !isRead ? '1px solid var(--error)' : 'none', maxWidth: '85%' }}>
-                 <strong style={{ fontSize: '0.8rem', color: msg.sender === 'Capo PR' ? 'var(--warning)' : 'white', display: 'block', marginBottom: '0.4rem' }}>{msg.sender} • {formatTime(msg.timestamp)}</strong>
-                 <p style={{ fontSize: '1rem', margin: 0 }}>{msg.text}</p>
-             </div>
-           ))}
+        <div style={{ display: 'flex', flexDirection: 'column-reverse', gap: '1rem', marginBottom: '1.5rem', maxHeight: '300px', overflowY: 'auto', paddingRight: '0.5rem' }}>
+           {chat.map((msg, idx) => {
+             const isMe = msg.sender === 'Tu' || msg.sender === user?.name;
+             const isNew = idx === 0 && !isRead;
+             return (
+               <div key={msg.id || idx} style={{ 
+                 alignSelf: isMe ? 'flex-end' : 'flex-start', 
+                 background: isMe ? 'var(--accent-color)' : 'rgba(255,255,255,0.05)', 
+                 padding: '1rem', 
+                 borderRadius: isMe ? '16px 16px 0 16px' : '16px 16px 16px 0', 
+                 border: !isMe && isNew ? '1px solid var(--error)' : '1px solid rgba(255,255,255,0.05)',
+                 maxWidth: '85%',
+                 boxShadow: !isMe && isNew ? '0 0 15px rgba(239,68,68,0.2)' : 'none'
+               }}>
+                   <strong style={{ fontSize: '0.8rem', color: msg.sender === 'Capo PR' ? 'var(--warning)' : 'white', display: 'block', marginBottom: '0.4rem' }}>{msg.sender === user?.name ? 'Tu' : msg.sender} • {formatTime(msg.timestamp)}</strong>
+                   <p style={{ fontSize: '1rem', margin: 0 }}>{msg.text}</p>
+               </div>
+             );
+           })}
         </div>
 
-        {!isRead && (
-            <Button variant="primary" onClick={() => setIsRead(true)} style={{ width: '100%', background: 'var(--error)', marginBottom: '1rem' }}>Segna Chiamata come Letta</Button>
+        {!isRead && chat.length > 0 && (
+            <Button variant="primary" onClick={() => {
+              setIsRead(true);
+              if (chat[0]?.id) localStorage.setItem(`nox_last_read_${user?.id}`, chat[0].id);
+            }} style={{ width: '100%', background: 'var(--error)', marginBottom: '1rem' }}>Segna Messaggi come Letti</Button>
         )}
 
         <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1rem' }}>

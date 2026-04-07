@@ -30,7 +30,7 @@ export function TableReservation() {
         tableName: selectedTable?.name || 'Non specificato',
         minSpend: calculateMinimumSpend()
       });
-      navigate('/customer');
+      navigate(-1);
     } catch (error) {
        console.error("Reservation failed:", error);
     }
@@ -57,7 +57,7 @@ export function TableReservation() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', padding: '1rem', paddingBottom: '2rem', flex: 1 }}>
       <header style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
-        <button onClick={() => navigate('/customer')} style={{ background: 'none', border: 'none', color: 'var(--text-primary)', cursor: 'pointer' }}>
+        <button onClick={() => navigate(-1)} style={{ background: 'none', border: 'none', color: 'var(--text-primary)', cursor: 'pointer' }}>
           <ArrowLeft size={24} />
         </button>
         <h2 style={{ fontSize: '1.3rem', margin: 0 }}>Prenota Tavolo</h2>

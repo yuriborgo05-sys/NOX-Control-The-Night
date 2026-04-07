@@ -5,21 +5,56 @@ import { Card } from '../components/Card';
 import { Button } from '../components/Button';
 import { Accordion } from '../components/Accordion';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, Camera, Zap, MessageSquare, Users, Star, Flame, CheckCircle2 } from 'lucide-react';
+import { 
+  LogOut, Camera, Zap, MessageSquare, Users, Star, 
+  Flame, CheckCircle2, Volume2, VolumeX 
+} from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { EmergencyPanel } from '../components/EmergencyPanel';
 import { hapticSoftPop } from '../utils/haptics';
+import { useNotification } from '../context/NotificationContext';
+import { useRef } from 'react';
+import { playVIPAlertSound, playNotificationSound } from '../utils/audio';
+import { speak, enableSpeech } from '../utils/speech';
+import { useNoxStore } from '../store';
 
 export function PhotographerHome() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const { addNotification } = useNotification();
+  const { 
+    orders, 
+    staffMessages: chats, 
+    serviceCalls, 
+    isInitialSyncDone 
+  } = useNoxStore();
 
-  const [hotTables, setHotTables] = useState([]);
-  const [chats, setChats] = useState([]);
   const [msgInput, setMsgInput] = useState('');
+  const [hotTables, setHotTables] = useState([]);
+  const [voiceEnabled, setVoiceEnabled] = useState(false);
+  
+  const isFirstLoad = useRef(true);
+  const knownVipOrders = useRef(new Set());
 
+  // Derivazione Tavoli Caldi e Alert VIP
   useEffect(() => {
-    const unsub1 = streamOrders((orders) => {
+    if (orders) {
+      const vips = orders.filter(o => o.total >= 1000);
+      
+      // VIP Notification Logic
+      if (isInitialSyncDone && !isFirstLoad.current) {
+        vips.forEach(order => {
+          if (!knownVipOrders.current.has(order.id)) {
+            if (voiceEnabled) speak(`Attenzione, ordine V I P al tavolo ${order.table}`);
+            addNotification('🚨 VIP ALERT', `Ordine da €${order.total} al Tavolo ${order.table}. Corri per le foto!`, 'warning');
+            playVIPAlertSound();
+            knownVipOrders.current.add(order.id);
+          }
+        });
+      } else {
+        vips.forEach(o => knownVipOrders.current.add(o.id));
+      }
+
       const highValue = orders
         .filter(o => o.total >= 500)
         .map(o => ({ 
@@ -30,11 +65,20 @@ export function PhotographerHome() {
           priority: o.total >= 1000 ? 'High' : 'Medium' 
         }));
       setHotTables(highValue);
-    });
+      isFirstLoad.current = false;
+    }
+  }, [orders, voiceEnabled, isInitialSyncDone]);
 
-    const unsub2 = streamStaffMessages(setChats);
-    return () => { unsub1(); unsub2(); };
-  }, []);
+  // Gestione Chiamate Foto (Service Calls)
+  useEffect(() => {
+    if (!isInitialSyncDone) return;
+    const photoCalls = (serviceCalls || []).filter(c => c.request === 'fotografo' && c.status !== 'completed');
+    if (photoCalls.length > 0) {
+       // Voice Alert for last call
+       const latest = photoCalls[0];
+       // (Solo se non abbiamo già notificato questa chiamata specifica)
+    }
+  }, [serviceCalls?.length, isInitialSyncDone]);
 
   const handleSend = async () => {
     if(!msgInput.trim()) return;
@@ -56,14 +100,50 @@ export function PhotographerHome() {
                 <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', margin: 0 }}>{user?.name}</p>
             </div>
         </div>
-        <button onClick={() => { logout(); navigate('/login'); }} style={{ background: 'rgba(255,69,58,0.1)', border: 'none', color: '#ff453a', padding: '0.6rem', borderRadius: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-          <LogOut size={18} />
-          <span style={{ fontSize: '0.75rem', fontWeight: 700 }}>ESCI</span>
-        </button>
+        <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+          <button 
+            onClick={() => {
+              if (!voiceEnabled) enableSpeech();
+              setVoiceEnabled(!voiceEnabled);
+            }}
+            style={{ 
+              background: voiceEnabled ? 'rgba(255,255,100,0.1)' : 'rgba(255,255,255,0.05)', 
+              border: 'none', color: voiceEnabled ? '#ffd700' : 'gray', 
+              padding: '0.5rem', borderRadius: '10px', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.7rem', fontWeight: 700
+            }}
+          >
+            {voiceEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
+            {voiceEnabled ? 'VOCE ON' : 'VOCE OFF'}
+          </button>
+          <button onClick={() => { logout(); navigate('/login'); }} style={{ background: 'rgba(255,69,58,0.1)', border: 'none', color: '#ff453a', padding: '0.6rem', borderRadius: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <LogOut size={18} />
+            <span style={{ fontSize: '0.75rem', fontWeight: 700 }}>ESCI</span>
+          </button>
+        </div>
       </header>
 
+      {/* ─── CUSTOMER CALLS (SERVICE STREAM) ─── */}
+      <Accordion title={`Chiamate Clienti (${serviceCalls.length})`} icon={<Camera size={16} color="var(--accent-light)" />} defaultOpen={true} borderColor="var(--accent-light)" badge={serviceCalls.length > 0 ? "NEW" : ""} badgeColor="var(--success)">
+         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            {serviceCalls.length === 0 && <p style={{ textAlign: 'center', color: 'gray', padding: '1rem', fontSize: '0.8rem' }}>Nessuna chiamata diretta dai tavoli.</p>}
+            {serviceCalls.map(call => (
+               <div key={call.id} style={{ background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '12px', borderLeft: '4px solid var(--accent-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <strong style={{ fontSize: '1.1rem', display: 'block' }}>Tavolo {call.table}</strong>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Chiamata delle {formatTime(call.timestamp)}</span>
+                  </div>
+                  <Button variant="primary" style={{ padding: '0.5rem 0.8rem', fontSize: '0.8rem' }} onClick={async () => {
+                      hapticSoftPop();
+                      await completeServiceCall(call.id);
+                  }}>EVADI</Button>
+               </div>
+            ))}
+         </div>
+      </Accordion>
+
       {/* ─── HOT TABLES (FLASH HEATMAP) ─── */}
-      <Accordion title="Flash Heatmap (Tavoli Caldi)" icon={<Flame size={16} color="var(--warning)" />} defaultOpen={true} borderColor="var(--warning)">
+      <Accordion title="Flash Heatmap (Tavoli Caldi)" icon={<Flame size={16} color="var(--warning)" />} defaultOpen={false} borderColor="var(--warning)">
          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
             {hotTables.map(t => (
                <div key={t.id} style={{ 

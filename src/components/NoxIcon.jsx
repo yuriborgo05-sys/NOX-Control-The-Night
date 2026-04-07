@@ -1,0 +1,98 @@
+import React from 'react';
+import { 
+  QrCode, Ticket, User, Star, Users, Clock, Wine, 
+  ChevronRight, Music, Camera, MapPin, Phone, 
+  Trophy, EyeOff, Eye, Sparkles, LogOut, Minus, 
+  Plus, Instagram, Globe, MessageCircle, Share2,
+  PieChart, TrendingUp, Download, Crown, BarChart3, 
+  Filter, AlertCircle, Snowflake, Package, Siren, Car,
+  ScanLine, History, ShieldAlert, Signal, RefreshCcw,
+  Bell, AlertTriangle, Coins, RefreshCw, Trash2, 
+  ArrowLeft, ShoppingBag, CreditCard, ShieldCheck, Search, Grid, X,
+  ArrowUp, Zap, IceCream, CupSoda, CheckCircle2, Map,
+  Wifi, WifiOff, LayoutGrid, MessageSquare, Send, DollarSign, Percent, BellRing,
+  Volume2, VolumeX, PackageOpen, CheckCircle, Info
+} from 'lucide-react';
+
+const ICONS = {
+  'qr-code': QrCode,
+  'ticket': Ticket,
+  'user': User,
+  'star': Star,
+  'users': Users,
+  'clock': Clock,
+  'wine': Wine,
+  'chevron-right': ChevronRight,
+  'music': Music,
+  'camera': Camera,
+  'map-pin': MapPin,
+  'phone': Phone,
+  'trophy': Trophy,
+  'eye-off': EyeOff,
+  'eye': Eye,
+  'sparkles': Sparkles,
+  'log-out': LogOut,
+  'minus': Minus,
+  'plus': Plus,
+  'instagram': Instagram,
+  'globe': Globe,
+  'message-circle': MessageCircle,
+  'share-2': Share2,
+  'pie-chart': PieChart,
+  'trending-up': TrendingUp,
+  'download': Download,
+  'crown': Crown,
+  'bar-chart-3': BarChart3,
+  'filter': Filter,
+  'alert-circle': AlertCircle,
+  'snowflake': Snowflake,
+  'package': Package,
+  'siren': Siren,
+  'car': Car,
+  'scan-line': ScanLine,
+  'history': History,
+  'shield-alert': ShieldAlert,
+  'signal': Signal,
+  'refresh-ccw': RefreshCcw,
+  'bell': Bell,
+  'alert-triangle': AlertTriangle,
+  'coins': Coins,
+  'refresh-cw': RefreshCw,
+  'trash-2': Trash2,
+  'arrow-left': ArrowLeft,
+  'shopping-bag': ShoppingBag,
+  'credit-card': CreditCard,
+  'shield-check': ShieldCheck,
+  'search': Search,
+  'grid': Grid,
+  'x': X,
+  'arrow-up': ArrowUp,
+  'zap': Zap,
+  'ice-cream': IceCream,
+  'cup-soda': CupSoda,
+  'check-circle-2': CheckCircle2,
+  'map': Map,
+  'wifi': Wifi,
+  'wifi-off': WifiOff,
+  'layout-grid': LayoutGrid,
+  'message-square': MessageSquare,
+  'send': Send,
+  'dollar-sign': DollarSign,
+  'percent': Percent,
+  'bell-ring': BellRing,
+  'volume-2': Volume2,
+  'volume-x': VolumeX,
+  'package-open': PackageOpen,
+  'check-circle': CheckCircle,
+  'info': Info
+};
+
+/**
+ * NoxIcon — Definitive static icon registry to resolve the Vite/Rollup 'mmons' crash.
+ * By centralizing all icons into a single registry, we force the bundler to transform 
+ * the lucide-react index exactly once, flattening the ESM transformation graph.
+ */
+export function NoxIcon({ name, ...props }) {
+  const IconComponent = ICONS[name] || Map;
+  return <IconComponent {...props} />;
+}

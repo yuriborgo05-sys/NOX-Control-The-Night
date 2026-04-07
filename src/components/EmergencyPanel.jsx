@@ -1,108 +1,142 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card } from './Card';
-import { ShieldAlert, ShieldCheck, HeartPulse, Car } from 'lucide-react';
+import { ShieldAlert, ShieldCheck, HeartPulse, Car, Loader2 } from 'lucide-react';
 import { useNotification } from '../context/NotificationContext';
-import { useNox } from '../context/NoxContext';
-import { hapticFraud } from '../utils/haptics';
+import { useNoxStore } from '../store';
+import { recordSOS } from '../services/db';
 
 export function EmergencyPanel() {
   const { addNotification } = useNotification();
-  const { config } = useNox();
+  const { userTable, prAssigned } = useNoxStore();
+  const [pendingType, setPendingType] = useState(null);
+  const [isSending, setIsSending] = useState(false);
 
-  const handleSOS = (type) => {
-    hapticFraud();
-    const msgs = {
-      security: "Allerta sicurezza inviata. La security è stata attivata nella tua zona.",
-      medical: "Emergenza medica segnalata. Il personale di soccorso è in arrivo.",
-      escort: "Richiesta scorta completata. Un addetto alla security ti accompagnerà in sicurezza."
-    };
-    addNotification(
-      "SOS INVIATO", 
-      msgs[type] || "Richiesta aiuto SOS inviata.", 
-      type === 'escort' ? "success" : "error"
-    );
+  // Auto-unlock logic if something hangs
+  useEffect(() => {
+    if (isSending) {
+      const t = setTimeout(() => setIsSending(false), 8000);
+      return () => clearTimeout(t);
+    }
+  }, [isSending]);
+
+  const handleSOS = async (type) => {
+    setIsSending(true);
+    try {
+      await recordSOS(type.toUpperCase(), {
+        tableName: userTable || 'Tavolo Anonimo',
+        pr: prAssigned || 'Nessuno',
+        category: type.toUpperCase(),
+        sentAt: new Date().toISOString()
+      });
+      addNotification("SOS INVIATO", "Richiesta ricevuta dalla security.", "success");
+    } catch (err) {
+      console.error("SOS Error:", err);
+      addNotification("ERRORE SINCRO", "Controlla la connessione internet.", "error");
+    } finally {
+      setIsSending(false);
+      setPendingType(null);
+    }
   };
 
-  const handleSafeExit = () => {
-    hapticFraud();
-    addNotification("SCORTA SICURA", "Ricerca vettura in corso... La security è stata avvisata.", "warning");
-    setTimeout(() => handleSOS('escort'), 3000);
-  };
-
-  const btnBase = {
+  const btnStyle = (bg, shadow) => ({
+    width: '100%',
+    padding: '1.25rem',
+    borderRadius: '20px',
+    border: 'none',
+    color: 'white',
+    fontWeight: 800,
+    fontSize: '0.9rem',
+    background: bg,
+    cursor: 'pointer',
+    marginBottom: '0.75rem',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: '0.6rem',
-    padding: '1rem 1.25rem',
-    borderRadius: '16px',
-    border: 'none',
-    cursor: 'pointer',
-    fontWeight: 700,
-    fontSize: '0.82rem',
-    letterSpacing: '0.03em',
-    color: 'white',
-    transition: 'all 0.2s ease',
-    width: '100%',
-  };
+    gap: '12px',
+    boxShadow: shadow,
+    transition: 'opacity 0.2s',
+    opacity: isSending ? 0.6 : 1,
+    position: 'relative',
+    zIndex: 10
+  });
 
   return (
-    <Card style={{ 
-      background: 'rgba(255, 59, 92, 0.04)', 
-      border: '1px solid rgba(255, 59, 92, 0.15)',
-      padding: '1rem',
-      marginTop: '1.5rem',
-      marginBottom: '1rem'
-    }}>
-      <h3 style={{ 
-        display: 'flex', alignItems: 'center', gap: '0.5rem', 
-        color: 'var(--error)', fontSize: '0.9rem', marginBottom: '1rem',
-        fontWeight: 800, letterSpacing: '0.02em'
+    <>
+      <Card style={{ 
+        background: 'rgba(255, 59, 92, 0.03)', 
+        border: '1px solid rgba(255, 59, 92, 0.15)',
+        padding: '1.25rem',
+        marginTop: '1.5rem',
+        marginBottom: '2rem'
       }}>
-        <ShieldAlert size={18} /> Emergenze
-      </h3>
+        <h3 style={{ 
+          display: 'flex', alignItems: 'center', gap: '0.6rem', 
+          color: 'var(--error)', fontSize: '0.9rem', marginBottom: '1.25rem',
+          fontWeight: 800, letterSpacing: '0.02em', textTransform: 'uppercase'
+        }}>
+          <ShieldAlert size={18} /> Sicurezza & Emergenza
+        </h3>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-        {/* Sicurezza */}
-        <button 
-          onClick={() => handleSOS('security')} 
-          style={{ 
-            ...btnBase, 
-            background: 'linear-gradient(135deg, #ff3b30, #cc2d25)',
-            boxShadow: '0 4px 16px rgba(255, 59, 48, 0.35)',
-          }}
-        >
-          <ShieldCheck size={20} /> SICUREZZA
-        </button>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <button 
+            onClick={() => setPendingType('security')}
+            disabled={isSending}
+            style={btnStyle('linear-gradient(135deg, #ff3b30, #cc2d25)', '0 6px 15px rgba(255, 59, 48, 0.3)')}
+          >
+            <ShieldCheck size={22} /> SICUREZZA
+          </button>
 
-        {/* Malore */}
-        <button 
-          onClick={() => handleSOS('medical')} 
-          style={{ 
-            ...btnBase, 
-            background: 'linear-gradient(135deg, #ff9500, #e68600)',
-            boxShadow: '0 4px 16px rgba(255, 149, 0, 0.35)',
-          }}
-        >
-          <HeartPulse size={20} /> MALORE
-        </button>
+          <button 
+            onClick={() => setPendingType('medical')}
+            disabled={isSending}
+            style={btnStyle('linear-gradient(135deg, #ff9500, #e68600)', '0 6px 15px rgba(255, 149, 0, 0.3)')}
+          >
+            <HeartPulse size={22} /> MALORE
+          </button>
+        </div>
+      </Card>
 
-        {/* Scorta Sicura */}
-        <button 
-          onClick={handleSafeExit} 
-          style={{ 
-            ...btnBase, 
-            background: 'linear-gradient(135deg, #5856d6, #4a48b8)',
-            boxShadow: '0 4px 16px rgba(88, 86, 214, 0.35)',
-          }}
-        >
-          <Car size={20} /> SCORTA SICURA
-        </button>
-      </div>
-
-      <p style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', marginTop: '0.8rem', textAlign: 'center', opacity: 0.7 }}>
-        L'abuso delle segnalazioni comporta il ban immediato.
-      </p>
-    </Card>
+      {pendingType && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
+          background: 'rgba(0,0,0,0.95)', backdropFilter: 'blur(10px)',
+          zIndex: 100000, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '20px'
+        }}>
+          <div style={{
+            background: '#15151e', padding: '2.5rem', borderRadius: '32px',
+            width: '100%', maxWidth: '380px', textAlign: 'center', border: '1px solid rgba(255,255,255,0.1)'
+          }}>
+            <div style={{ 
+              width: '70px', height: '70px', background: 'rgba(255,59,92,0.1)', 
+              borderRadius: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              margin: '0 auto 1.5rem', color: '#ff3b30'
+            }}>
+              <ShieldAlert size={36} />
+            </div>
+            <h2 style={{ color: 'white', fontWeight: 900, marginBottom: '1rem' }}>CONFERMI?</h2>
+            <p style={{ color: 'rgba(255,255,255,0.6)', lineHeight: 1.5, marginBottom: '2.5rem' }}>
+              L'utilizzo di questi bottoni è una cosa seria.<br/>
+              <strong>L'abuso comporta il ban immediato.</strong>
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+              <button 
+                onClick={() => handleSOS(pendingType)}
+                disabled={isSending}
+                style={btnStyle('#ff3b30', '0 10px 25px rgba(255,59,48,0.3)')}
+              >
+                {isSending ? <Loader2 className="animate-spin" /> : 'SÌ, CONFERMO'}
+              </button>
+              <button 
+                onClick={() => setPendingType(null)}
+                style={btnStyle('rgba(255,255,255,0.05)', 'none')}
+              >
+                ANNULLA
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

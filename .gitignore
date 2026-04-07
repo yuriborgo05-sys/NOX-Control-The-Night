@@ -1,10 +1,8 @@
 node_modules
 node_modules_old
-dist
-dist-ssr
-*.local
-.env
-.env.*
 .vercel
-.DS_Store
+dist
+.env
 *.log
+build_*.txt
+true_error.txt

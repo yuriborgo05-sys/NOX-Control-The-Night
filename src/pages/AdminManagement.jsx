@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { streamOrders, validateBottleQR, streamSystemState, updateSystemState } from '../services/db';
 import { useNotification } from '../context/NotificationContext';
-import { Wifi, WifiOff, Zap } from 'lucide-react';
+import { 
+  Wifi, WifiOff, Zap, ArrowLeft, Users, 
+  TableProperties, Wine, CreditCard, ShieldAlert 
+} from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
-import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Users, TableProperties, Wine, CreditCard, ShieldAlert } from 'lucide-react';
 
 export function AdminManagement() {
   const navigate = useNavigate();
@@ -87,7 +89,7 @@ export function AdminManagement() {
           <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
              <Wine size={20} color="var(--warning)" /> Override Ordini Bottiglie
           </h3>
-          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>Visione globale stato ordini ai tavoli. Consente lo scavalcamento del QR univoco cliente se i loro smartphone sono scarichi o rotti.</p>
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>Visione globale stato ordini ai tavoli. Consente lo scavalcamento della procedura standard se necessario.</p>
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
              {liveOrders.map(order => (
@@ -106,7 +108,7 @@ export function AdminManagement() {
                       onClick={() => validateBottleQR(order.id)}
                       style={{ width: '100%', display: 'flex', justifyContent: 'center', gap: '0.5rem', padding: '0.5rem', fontSize: '0.85rem' }}
                     >
-                       <ShieldAlert size={16} /> Override QR: Forza "Consegnata" 
+                       <ShieldAlert size={16} /> Forza Stato: "Consegnata" 
                     </Button>
                   )}
               </div>

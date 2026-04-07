@@ -8,7 +8,7 @@ export function CatalogHeader({ user }) {
   const handleBack = () => {
     const role = user?.role?.toLowerCase();
     if(role === 'pr') navigate('/pr');
-    else if(role === 'capo_pr' || role === 'admin') navigate('/head-pr');
+    else if(role === 'capo_pr' || role === 'admin') navigate('/capo-pr');
     else navigate('/customer');
   };
 

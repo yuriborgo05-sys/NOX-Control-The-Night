@@ -2,7 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, ShoppingBag, Plus, Minus, CreditCard, CheckCircle2, ShieldCheck, MapPin, Zap, Search } from 'lucide-react';
+import { 
+  ArrowLeft, ShoppingBag, Plus, Minus, CreditCard, 
+  CheckCircle2, ShieldCheck, MapPin, Zap, Search, 
+  Grid, X 
+} from 'lucide-react';
 import { noxMenu } from '../data/noxData';
 import { playCoinSound, playBottleDeliveredSound } from '../utils/audio';
 import { hapticSoftPop, hapticBottleDelivered } from '../utils/haptics';
@@ -25,6 +29,7 @@ export function BottleCatalog() {
   const [otherTable, setOtherTable] = useState('');
   const [giftMessage, setGiftMessage] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [showFullMenu, setShowFullMenu] = useState(false);
   
   // Mixers logic (dynamically get from Analcolici category, fallback if not found)
   const MIXERS_CATALOG = noxMenu.find(c => c.category === 'Analcolici')?.items.map(i => i.name) || [];
@@ -115,7 +120,7 @@ export function BottleCatalog() {
             
             <Card style={{ background: 'rgba(255,255,255,0.02)', padding: '1.5rem', width: '100%', marginBottom: '2rem' }}>
                 <p style={{ fontSize: '0.9rem', color: 'var(--accent-color)', fontWeight: 600, marginBottom: '0.5rem' }}>Segui in tempo reale</p>
-                <p style={{ fontSize: '0.85rem' }}>Potrai mostrare il QR Univoco al cameriere per sbloccare la consegna della bottiglia direttamente dalo storico ordini.</p>
+                <p style={{ fontSize: '0.85rem' }}>Il cameriere riceverà i dettagli dell'ordine e consegnerà la bottiglia direttamente al tuo tavolo.</p>
             </Card>
 
             <Button variant="primary" style={{ width: '100%' }} onClick={() => navigate('/profile')}>Vai ai Miei Ordini</Button>
@@ -252,14 +257,45 @@ export function BottleCatalog() {
         />
       </div>
 
-      {/* Categories Horizontal Scroll */}
-      <div style={{ display: 'flex', overflowX: 'auto', gap: '0.75rem', marginBottom: '1.5rem', paddingBottom: '0.5rem', scrollbarWidth: 'none' }}>
+      {/* Category Selection Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+        <div style={{ flex: 1, marginRight: '1rem' }}>
+          <label style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.4rem', fontWeight: 700 }}>Categoria</label>
+          <select 
+            className="input-base" 
+            value={category} 
+            onChange={e => setCategory(e.target.value)}
+            style={{ width: '100%', padding: '0.6rem', fontSize: '0.9rem', color: 'white', background: 'rgba(255,255,255,0.05)' }}
+          >
+            {noxMenu.map(c => (
+              <option key={c.category} value={c.category} style={{ color: 'black' }}>
+                {c.category}
+              </option>
+            ))}
+          </select>
+        </div>
+        <Button 
+          variant="secondary" 
+          onClick={() => setShowFullMenu(true)}
+          style={{ padding: '0.6rem 0.8rem', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem' }}
+        >
+          <Grid size={16} /> TUTTO
+        </Button>
+      </div>
+
+      {/* Categories Horizontal Scroll (Keep for quick single-tap, but made smaller) */}
+      <div style={{ display: 'flex', overflowX: 'auto', gap: '0.5rem', marginBottom: '1.5rem', paddingBottom: '0.5rem', scrollbarWidth: 'none' }}>
          {noxMenu.map(c => (
-             <Button key={c.category} variant={c.category === category ? 'primary' : 'secondary'} 
+             <button key={c.category} 
                      onClick={() => setCategory(c.category)} 
-                     style={{ whiteSpace: 'nowrap', padding: '0.5rem 1rem', borderRadius: '20px', fontSize: '0.9rem' }}>
+                     style={{ 
+                        whiteSpace: 'nowrap', padding: '0.4rem 0.8rem', borderRadius: '15px', fontSize: '0.75rem',
+                        border: 'none', background: c.category === category ? 'var(--accent-color)' : 'rgba(255,255,255,0.05)',
+                        color: c.category === category ? 'white' : 'var(--text-secondary)',
+                        fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s'
+                     }}>
                  {c.category}
-             </Button>
+             </button>
          ))}
       </div>
 
@@ -293,6 +329,52 @@ export function BottleCatalog() {
              );
          })}
       </div>
+
+       {/* Full Catalog Grid Modal (Schermo Intero) */}
+       {showFullMenu && (
+         <div style={{
+           position: 'fixed', inset: 0, background: 'rgba(5,5,10,0.98)',
+           backdropFilter: 'blur(20px)', zIndex: 2000, padding: '1.5rem',
+           display: 'flex', flexDirection: 'column', animation: 'fadeIn 0.3s ease-out'
+         }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+              <h2 style={{ fontSize: '1.5rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <Grid color="var(--accent-color)" /> Catalogo Bamboo
+              </h2>
+              <button 
+                onClick={() => setShowFullMenu(false)}
+                style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', padding: '0.6rem', borderRadius: '50%', cursor: 'pointer' }}
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <div style={{ flex: 1, overflowY: 'auto', paddingBottom: '2rem' }}>
+              {noxMenu.map(cat => (
+                <div key={cat.category} style={{ marginBottom: '2rem' }}>
+                   <h3 style={{ fontSize: '0.85rem', color: 'var(--accent-light)', textTransform: 'uppercase', letterSpacing: '2px', marginBottom: '1rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.5rem' }}>
+                     {cat.category}
+                   </h3>
+                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                     {cat.items.map(item => (
+                       <button 
+                         key={item.name}
+                         onClick={() => { setCategory(cat.category); setShowFullMenu(false); setSearchTerm(item.name); }}
+                         style={{
+                           background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)',
+                           borderRadius: '16px', padding: '1rem', textAlign: 'left', cursor: 'pointer'
+                         }}
+                       >
+                         <strong style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.2rem' }}>{item.name}</strong>
+                         <span style={{ color: 'var(--accent-color)', fontSize: '0.85rem', fontWeight: 700 }}>€ {item.price}</span>
+                       </button>
+                     ))}
+                   </div>
+                </div>
+              ))}
+            </div>
+         </div>
+       )}
 
        {/* Floating Tab Checkout */}
        <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, padding: '1rem', background: 'rgba(28, 28, 30, 0.85)', backdropFilter: 'blur(30px) saturate(200%)', borderTop: '1px solid rgba(255,255,255,0.1)', zIndex: 100 }}>

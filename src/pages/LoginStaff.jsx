@@ -6,7 +6,10 @@ import { useNavigate } from 'react-router-dom';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
 
+console.log('BOOT-80: REAL LoginStaff.jsx EXECUTING');
+
 export function LoginStaff() {
+  console.log('BOOT-81: LoginStaff RENDER START');
   const { login, user } = useAuth();
   const { config } = useNox();
   const navigate = useNavigate();
@@ -18,26 +21,35 @@ export function LoginStaff() {
 
   // Handle navigation automatically when context updates 'user'
   useEffect(() => {
-    if (user && window.location.pathname === '/staff') {
+    if (user) {
+      console.log('BOOT-82: Staff user detected, role:', user.role);
       const targetRole = user.role || 'cliente';
-      if (targetRole === 'cliente') {
-         navigate('/customer');
-         return;
+      
+      const isStaffLoginPage = ['/staff', '/login', '/', '/staff-auth', '/client-auth'].includes(window.location.pathname);
+
+      if (isStaffLoginPage) {
+        if (targetRole === 'cliente') {
+           navigate('/customer');
+           return;
+        }
+        const routes = {
+          pr: '/pr',
+          capo_pr: '/capo-pr',
+          head_pr: '/capo-pr',
+          immagine: '/immagine',
+          cameriere: '/waiter',
+          admin: '/admin',
+          cassa: '/admin',
+          bodyguard: '/bodyguard',
+          direzione: '/analytics',
+          fotografo: '/photographer',
+          security: '/bodyguard',
+          cambusa: '/cambusa'
+        };
+        const destination = routes[targetRole] || '/admin';
+        console.log('BOOT-83: Staff Redirecting to:', destination);
+        navigate(destination);
       }
-      const routes = {
-        pr: '/pr',
-        capo_pr: '/head-pr',
-        immagine: '/immagine',
-        cameriere: '/waiter',
-        admin: '/admin',
-        cassa: '/admin',
-        bodyguard: '/bodyguard',
-        direzione: '/direzione',
-        fotografo: '/photographer',
-        security: '/bodyguard',
-        cambusa: '/cambusa'
-      };
-      navigate(routes[targetRole] || '/admin');
     }
   }, [user, navigate]);
 
@@ -59,7 +71,7 @@ export function LoginStaff() {
   return (
     <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <Card style={{ width: '100%', borderTop: '4px solid var(--accent-light)' }}>
-        <button onClick={() => navigate('/login')} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem', fontSize: '0.85rem' }}>
+        <button onClick={() => navigate('/client-auth')} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem', fontSize: '0.85rem' }}>
           <ArrowLeft size={16} /> Login Clienti
         </button>
 

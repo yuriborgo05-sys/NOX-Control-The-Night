@@ -4,12 +4,19 @@ import { useNotification } from '../context/NotificationContext';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
 import { Accordion } from '../components/Accordion';
-import { QrCode as QrIcon, Ticket, Star, Users, Clock, Wine, ChevronRight, Music, Camera, MapPin, Phone, Trophy, EyeOff, Eye, Sparkles, LogOut, Minus, Plus, Instagram, Globe, MessageCircle } from 'lucide-react';
+import { 
+  QrCode, Ticket, User, Star, Users, Clock, Wine, 
+  ChevronRight, Music, Camera, MapPin, Phone, 
+  Trophy, EyeOff, Eye, Sparkles, LogOut, Minus, 
+  Plus, Instagram, Globe, MessageCircle, Share2 
+} from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Avatar } from '../components/Avatar';
-import { playCheckInSound } from '../utils/audio';
+import { playCheckInSound, playNotificationSound } from '../utils/audio';
 import { hapticCheckIn, hapticSoftPop } from '../utils/haptics';
-import { streamOrders, recordServiceCall, streamAnalytics } from '../services/db';
+import { useRef } from 'react';
+import { streamOrders, recordServiceCall, streamAnalytics, streamClubConfig } from '../services/db';
+
 import { generateDynamicToken } from '../utils/qr';
 import { EmergencyPanel } from '../components/EmergencyPanel';
 import { useNox } from '../context/NoxContext';
@@ -17,13 +24,36 @@ import { useNoxStore } from '../store';
 import { CustomerHeader } from '../features/customer/CustomerHeader';
 import { CustomerStatusCard } from '../features/customer/CustomerStatusCard';
 
+console.log('BOOT-100: REAL CustomerHome.jsx EXECUTING');
+
 export function CustomerHome() {
+  console.log('BOOT-101: CustomerHome RENDER START');
   const { user, logout } = useAuth();
-  const { hasEntered, liveDuration, entryTime } = useNoxStore();
+  const { 
+    hasEntered, 
+    liveDuration, 
+    entryTime, 
+    userTable,
+    setCustomerEntry,
+    setCustomerExit
+  } = useNoxStore();
   const { config } = useNox();
   const { addNotification } = useNotification();
   const navigate = useNavigate();
   const [privacyShield, setPrivacyShield] = useState(false);
+  const [eventConfig, setEventConfig] = useState({
+    eventTitle: "BAMBOO SPECIAL NIGHT",
+    eventDate: "SABATO 05 APRILE",
+    eventCover: "https://images.unsplash.com/photo-1566737236500-c8ac43014a67?q=80&w=1000&auto=format&fit=crop"
+  });
+
+  // Stream club config for event cover
+  useEffect(() => {
+    const unsub = streamClubConfig((data) => {
+      setEventConfig(data);
+    });
+    return () => unsub();
+  }, []);
 
   // States
   const [canQty, setCanQty] = useState(1);
@@ -45,6 +75,9 @@ export function CustomerHome() {
   const [monthlyRecord] = useState({ table: 'Tavolo VIP 2', spend: 15400, date: '12 Marzo' });
   const [allOrders, setAllOrders] = useState([]);
   const [qrToken, setQrToken] = useState('');
+  
+  const prevStatuses = useRef({}); // { orderId: status }
+  const isFirstLoadOrders = useRef(true);
 
   // Viewers FOMO
   const [viewers, setViewers] = useState(28);
@@ -55,20 +88,53 @@ export function CustomerHome() {
     return () => clearInterval(interval);
   }, []);
 
-  // Dynamic QR
+  // Dynamic QR (Time-Sync Security)
+  const [activeOrderId, setActiveOrderId] = useState(null);
+
   useEffect(() => {
     const updateToken = () => {
-      if (user) setQrToken(generateDynamicToken(user.id || user.email));
+      const targetId = activeOrderId || qrToken || user?.id; // Try order first
+      if (targetId) setQrToken(generateDynamicToken(targetId));
     };
     updateToken();
-    const interval = setInterval(updateToken, 60000);
+    const interval = setInterval(updateToken, 30000); // 30s for better security
     return () => clearInterval(interval);
-  }, [user]);
+  }, [user, activeOrderId, qrToken]);
 
-  // Stream orders for top tables
+  // Stream orders for top tables and status tracking
   useEffect(() => {
-    const unsubOrders = streamOrders((orders) => {
-       setAllOrders(orders);
+     const unsubOrders = streamOrders((orders) => {
+        setAllOrders(orders);
+        
+        // Find active order for this user/table to drive the security QR
+        const myOrder = orders.find(o => o.table === userTable);
+        if (myOrder) setActiveOrderId(myOrder.id);
+        
+        // Status Notification Logic
+       if (!isFirstLoadOrders.current) {
+         orders.forEach(order => {
+           // Only notify for THIS user's table or name
+           if (order.userName === user?.name || order.table === userTable) {
+             const prevStatus = prevStatuses.current[order.id];
+             if (prevStatus && prevStatus !== order.status) {
+                let msg = "";
+                if (order.status === 'preparing') msg = "Il tuo ordine è in preparazione!";
+                if (order.status === 'ready') msg = "In arrivo! Il cameriere sta portando le bottiglie.";
+                if (order.status === 'delivered') msg = "Buon divertimento! Ordine consegnato.";
+                
+                if (msg) {
+                  addNotification("Aggiornamento Ordine", msg, "info");
+                  playNotificationSound();
+                }
+             }
+             prevStatuses.current[order.id] = order.status;
+           }
+         });
+       } else {
+         orders.forEach(o => { prevStatuses.current[o.id] = o.status; });
+         isFirstLoadOrders.current = false;
+       }
+
        const summaries = orders.reduce((acc, o) => {
           const t = o.table || 'Anonimo';
           acc[t] = (acc[t] || 0) + (o.total || 0);
@@ -81,7 +147,7 @@ export function CustomerHome() {
        if(sorted.length > 0) setTopTables(sorted);
     });
     return () => { if(unsubOrders) unsubOrders(); };
-  }, []);
+  }, [user, userTable]);
 
   // VIP Progression
   const totalSpend = allOrders
@@ -106,14 +172,11 @@ export function CustomerHome() {
     if (!hasEntered) {
       playCheckInSound();
       hapticCheckIn();
-      setHasEntered(true);
-      setEntryTime(Date.now());
+      setCustomerEntry('Tavolo Demo', 'Sara B.');
       addNotification("✅ Ingresso Confermato", `Benvenuto! Scansione ingresso completata.`, "success");
     } else {
       const durationMins = Math.max(1, Math.round((Date.now() - entryTime) / 60000));
-      setHasEntered(false);
-      setEntryTime(null);
-      setLiveDuration(0);
+      setCustomerExit();
       addNotification("👋 Arrivederci!", `Uscita registrata. Permanenza: ${durationMins} min.`, "info");
     }
   };
@@ -123,6 +186,28 @@ export function CustomerHome() {
     totalSpend,
     totalBottles: allOrders.filter(o => o.userName === user?.name).reduce((s, o) => s + (o.items?.reduce((a, i) => a + i.qty, 0) || 0), 0),
     totalOrders: allOrders.filter(o => o.userName === user?.name).length,
+  };
+
+  const activeOrderForSharing = allOrders.find(o => (o.userName === user?.name || o.table === userTable) && o.isEntered);
+
+  const handleSharePass = async () => {
+    if (!activeOrderForSharing) return;
+    const shareUrl = `${window.location.origin}/exit-pass?id=${activeOrderForSharing.id}`;
+    
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Pass Uscita Bamboo',
+          text: `Ecco il pass per uscire dal Bamboo per il ${activeOrderForSharing.table}. Scansionalo all'uscita!`,
+          url: shareUrl,
+        });
+      } catch (err) {
+        console.log('Share failed:', err);
+      }
+    } else {
+      navigator.clipboard.writeText(shareUrl);
+      addNotification("Link Copiato", "Invia il link ai tuoi amici per l'uscita.", "success");
+    }
   };
 
   return (
@@ -152,6 +237,74 @@ export function CustomerHome() {
           </button>
         </div>
       </header>
+      
+      {/* ─── EVENT HERO COVER (POINT 5) ─── */}
+      {eventConfig && (
+        <div style={{
+          position: 'relative',
+          width: '100%',
+          height: '200px',
+          borderRadius: '24px',
+          overflow: 'hidden',
+          marginBottom: '0.5rem',
+          boxShadow: '0 10px 40px rgba(0,0,0,0.5)',
+          border: '1px solid rgba(255,255,255,0.08)'
+        }}>
+          <img 
+            src={eventConfig.eventCover || eventConfig.imageUrl || eventConfig.cover || 'https://images.unsplash.com/photo-1566737236500-c8ac43014a67?q=80&w=1000&auto=format&fit=crop'} 
+            alt="Event Cover" 
+            onError={(e) => { 
+                if (e.target.src !== 'https://images.unsplash.com/photo-1566737236500-c8ac43014a67?q=80&w=1000&auto=format&fit=crop') {
+                    e.target.src = 'https://images.unsplash.com/photo-1566737236500-c8ac43014a67?q=80&w=1000&auto=format&fit=crop';
+                }
+            }}
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+          />
+          <div style={{
+            position: 'absolute',
+            inset: 0,
+            background: 'linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.3) 50%, transparent 100%)',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'flex-end',
+            padding: '1.25rem'
+          }}>
+            <span style={{ 
+              fontSize: '0.65rem', 
+              color: 'var(--accent-light)', 
+              fontWeight: 800, 
+              textTransform: 'uppercase', 
+              letterSpacing: '0.15em',
+              marginBottom: '0.25rem'
+            }}>
+              {eventConfig.eventDate}
+            </span>
+            <h1 style={{ 
+              fontSize: '1.4rem', 
+              color: 'white', 
+              margin: 0, 
+              fontWeight: 900,
+              textShadow: '0 2px 10px rgba(0,0,0,0.5)'
+            }}>
+              {eventConfig.eventTitle}
+            </h1>
+          </div>
+          <div style={{
+            position: 'absolute',
+            top: '1rem',
+            right: '1rem',
+            background: 'rgba(255,255,255,0.1)',
+            backdropFilter: 'blur(10px)',
+            padding: '0.4rem 0.75rem',
+            borderRadius: '20px',
+            fontSize: '0.65rem',
+            fontWeight: 800,
+            border: '1px solid rgba(255,255,255,0.1)'
+          }}>
+            LIVE EVENT
+          </div>
+        </div>
+      )}
 
       {/* ─── STATUS CARD ─── */}
       <div style={{
@@ -181,7 +334,7 @@ export function CustomerHome() {
       <button
         onClick={() => navigate('/catalog')}
         style={{
-          width: '100%', padding: '1.25rem', borderRadius: '18px', border: 'none', cursor: 'pointer',
+          width: '100%', padding: '1.25rem', borderRadius: '18px', cursor: 'pointer',
           background: hasEntered
             ? 'linear-gradient(135deg, #a855f7, #7c3aed, #6366f1)' 
             : 'linear-gradient(135deg, rgba(168,85,247,0.15), rgba(99,102,241,0.08))',
@@ -267,7 +420,11 @@ export function CustomerHome() {
       {hasEntered && totalSpend >= 500 && (
           <Accordion title="Servizio Fotografo VIP" icon={<Camera size={16} />} badge="Chiamata" badgeColor="var(--accent-color)" borderColor="var(--accent-light)">
              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>Richiedi il fotografo ufficiale per uno shooting privato.</p>
-             <Button variant="primary" style={{ width: '100%', padding: '0.8rem', fontSize: '0.9rem' }} onClick={() => { hapticCheckIn(); addNotification('Fotografo', 'Il fotografo sta arrivando al tuo tavolo!', 'success');}}>Richiama Fotografo</Button>
+             <Button variant="primary" style={{ width: '100%', padding: '0.8rem', fontSize: '0.9rem' }} onClick={() => { 
+                hapticCheckIn(); 
+                recordServiceCall('fotografo', { table: userTable });
+                addNotification('Fotografo', 'Il fotografo sta arrivando al tuo tavolo!', 'success');
+             }}>Richiama Fotografo</Button>
           </Accordion>
       )}
 
@@ -287,17 +444,21 @@ export function CustomerHome() {
       {hasEntered && totalSpend >= 500 && (
           <Accordion title="Jukebox Privé (Esclusiva VIP)" icon={<Music size={16} />} badge="250€" badgeColor="var(--accent-color)" borderColor="var(--accent-light)">
              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>Salta la coda del DJ. Fai scoppiare la tua traccia preferita.</p>
-             <Button variant="primary" style={{ width: '100%', padding: '0.8rem', fontSize: '0.9rem' }} onClick={() => { hapticCheckIn(); addNotification('DJ Alert', 'Richiesta VIP inviata in Console.', 'success');}}>Scegli Canzone & Paga</Button>
+             <Button variant="primary" style={{ width: '100%', padding: '0.8rem', fontSize: '0.9rem' }} onClick={() => { 
+                hapticCheckIn(); 
+                recordServiceCall('jukebox', { table: userTable });
+                addNotification('DJ Alert', 'Richiesta VIP inviata in Console.', 'success');
+             }}>Scegli Canzone & Paga</Button>
           </Accordion>
       )}
 
       <Accordion title="Prenotazione Tavolo" icon={<Ticket size={16} />} defaultOpen={true} borderColor="var(--accent-color)">
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1.25rem' }}>
           {[
             { label: 'Tavolo', value: userTable, color: 'var(--accent-light)' },
-            { label: 'Persone', value: '6 Ospiti', color: 'var(--text-primary)' },
+            { label: 'Persone', value: activeOrderForSharing ? `${activeOrderForSharing.pax} Ospiti` : '6 Ospiti', color: 'var(--text-primary)' },
             { label: 'Spesa Minima', value: '€ 500', color: 'var(--warning)' },
-            { label: 'PR Titolare', value: 'Sara B.', color: 'var(--text-primary)' },
+            { label: 'PR Titolare', value: user?.prAssigned || 'Sara B.', color: 'var(--text-primary)' },
           ].map(({ label, value, color }) => (
             <div key={label} style={{ background: 'rgba(255,255,255,0.03)', padding: '0.75rem', borderRadius: '10px' }}>
               <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: '0 0 0.2rem', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</p>
@@ -305,8 +466,42 @@ export function CustomerHome() {
             </div>
           ))}
         </div>
+
+        {/* QR Section */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '1.5rem', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.05)' }}>
+          <div style={{ 
+            padding: '1.25rem', background: 'white', borderRadius: '28px',
+            boxShadow: '0 0 40px rgba(124,58,237,0.2)'
+          }}>
+            <img 
+              src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${qrToken}`} 
+              alt="QR Entry" 
+              style={{ width: '150px', height: '150px', display: 'block' }} 
+            />
+          </div>
+          
+          {activeOrderForSharing && (
+            <Button 
+              variant="primary" 
+              onClick={handleSharePass}
+              style={{ 
+                width: '100%', 
+                background: 'linear-gradient(135deg, #25D366, #128C7E)', // WhatsApp Green 
+                borderColor: '#128C7E',
+                gap: '8px'
+              }}
+            >
+              <Share2 size={18} /> DIVIDI PASS USCITA ({activeOrderForSharing.paxCheckedIn - activeOrderForSharing.paxCheckedOut} RIMASTI)
+            </Button>
+          )}
+          
+          <p style={{ color: 'var(--text-tertiary)', fontSize: '0.7rem', textAlign: 'center', margin: 0 }}>
+            {activeOrderForSharing ? 'Condividi questo pass con i tuoi amici per l\'uscita.' : 'Mostra questo codice all\'ingresso per far entrare il gruppo.'}
+          </p>
+        </div>
+
         {!hasEntered && (
-          <button onClick={() => navigate('/reservation')} style={{ width: '100%', marginTop: '1rem', padding: '0.75rem', background: 'rgba(124,58,237,0.15)', border: '1px solid rgba(124,58,237,0.3)', color: 'var(--accent-light)', borderRadius: '10px', cursor: 'pointer', fontWeight: 600, fontSize: '0.9rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+          <button onClick={() => navigate('/reserve')} style={{ width: '100%', marginTop: '1rem', padding: '0.75rem', background: 'rgba(124,58,237,0.15)', border: '1px solid rgba(124,58,237,0.3)', color: 'var(--accent-light)', borderRadius: '10px', cursor: 'pointer', fontWeight: 600, fontSize: '0.9rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
             Modifica Prenotazione <ChevronRight size={16} />
           </button>
         )}
@@ -316,10 +511,10 @@ export function CustomerHome() {
           <Accordion title="Chiama Servizio" icon={<Wine size={16} />} borderColor="var(--accent-color)">
            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>Richiedi assistenza al tuo tavolo.</p>
            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-              <Button variant="secondary" onClick={() => { recordServiceCall('ghiaccio'); addNotification('Ghiaccio', 'Il cameriere sta arrivando', 'success'); }} style={{ padding: '0.75rem', fontSize: '0.8rem' }}>🧊 Ghiaccio</Button>
+              <Button variant="secondary" onClick={() => { recordServiceCall('ghiaccio', { table: userTable }); addNotification('Ghiaccio', 'Il cameriere sta arrivando', 'success'); }} style={{ padding: '0.75rem', fontSize: '0.8rem' }}>🧊 Ghiaccio</Button>
               <Button variant="secondary" onClick={() => setShowCanSelector(!showCanSelector)} style={{ padding: '0.75rem', fontSize: '0.8rem', background: showCanSelector ? 'rgba(255,255,255,0.1)' : '' }}>🥤 Analcolici</Button>
-              <Button variant="secondary" onClick={() => addNotification('Pulizia', 'Il cameriere sta arrivando', 'success')} style={{ padding: '0.75rem', fontSize: '0.8rem' }}>🧹 Pulizia</Button>
-              <Button variant="secondary" onClick={() => { recordServiceCall('sos'); addNotification('SOS', 'La sicurezza è stata allertata', 'error'); }} style={{ padding: '0.75rem', fontSize: '0.8rem', color: 'var(--error)', borderColor: 'var(--error)' }}>🚨 SOS</Button>
+              <Button variant="secondary" onClick={() => { recordServiceCall('pulizia', { table: userTable }); addNotification('Pulizia', 'Il cameriere sta arrivando', 'success'); }} style={{ padding: '0.75rem', fontSize: '0.8rem' }}>🧹 Pulizia</Button>
+              <Button variant="secondary" onClick={() => { recordServiceCall('sos', { table: userTable }); addNotification('SOS', 'La sicurezza è stata allertata', 'error'); }} style={{ padding: '0.75rem', fontSize: '0.8rem', color: 'var(--error)', borderColor: 'var(--error)' }}>🚨 SOS</Button>
             </div>
 
             {showCanSelector && (

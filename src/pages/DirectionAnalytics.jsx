@@ -2,145 +2,32 @@ import React, { useState, useEffect } from 'react';
 import { streamOrders, streamAnalytics } from '../services/db';
 import { useAuth } from '../context/AuthContext';
 import { EmergencyPanel } from '../components/EmergencyPanel';
+import { PRLeaderboard } from '../components/PRLeaderboard';
 import { Card } from '../components/Card';
 import { Accordion } from '../components/Accordion';
 import { useNavigate } from 'react-router-dom';
 import { 
-  LogOut, PieChart, TrendingUp, Download, Users, Crown, Star, Wine, 
-  BarChart3, Filter, MapPin, AlertCircle, Snowflake, Package, Siren, Car 
+  LogOut, PieChart, TrendingUp, Download, Users, 
+  Crown, Star, Wine, BarChart3, Filter, MapPin, 
+  AlertCircle, Snowflake, Package, Siren, Car 
 } from 'lucide-react';
 import { useNox } from '../context/NoxContext';
+import { useNoxStore } from '../store';
 
 const TABS = ['KPI & Clientela', 'Logistica & Sicurezza', 'Bottiglie & Bar', 'Heatmap', 'Staff Performance'];
 
-const LEADERBOARD_CATEGORIES = [
-  { key: 'fatturato', label: 'Fatturato', unit: '€', decimals: 0 },
-  { key: 'bottiglie', label: 'Bottiglie', unit: '', decimals: 0 },
-  { key: 'tavoli', label: 'Tavoli', unit: '', decimals: 0 },
-  { key: 'persone', label: 'Persone', unit: '', decimals: 0 },
-  { key: 'mediaSpesa', label: 'Media €/Tav', unit: '€', decimals: 0 },
-];
 
-const PR_DATA = [
-  { name: 'Alex Rossi', avatar: 'AR', fatturato: 8200, bottiglie: 24, tavoli: 10, persone: 85, mediaSpesa: 820 },
-  { name: 'Marco T.', avatar: 'MT', fatturato: 6100, bottiglie: 19, tavoli: 8, persone: 70, mediaSpesa: 762 },
-  { name: 'Giulia B.', avatar: 'GB', fatturato: 5400, bottiglie: 14, tavoli: 14, persone: 120, mediaSpesa: 385 },
-  { name: 'Francesca N.', avatar: 'FN', fatturato: 3200, bottiglie: 9, tavoli: 6, persone: 95, mediaSpesa: 533 },
-  { name: 'Luca V.', avatar: 'LV', fatturato: 1800, bottiglie: 5, tavoli: 3, persone: 30, mediaSpesa: 600 },
-];
-
-function PRLeaderboard({ data }) {
-  const [catIdx, setCatIdx] = useState(0);
-  const cat = LEADERBOARD_CATEGORIES[catIdx];
-  const sorted = [...data].sort((a, b) => b[cat.key] - a[cat.key]);
-  const topValue = sorted[0][cat.key];
-  const medals = ['🥇', '🥈', '🥉'];
-  const medalColors = ['var(--gold)', 'rgba(200,200,220,0.8)', '#cd7f32'];
-
-  const fmt = (v) => {
-    const int = Math.round(v);
-    return cat.unit === '€' ? `€ ${int.toLocaleString('it-IT')}` : `${int} ${cat.unit}`.trim();
-  };
-
-  return (
-    <div>
-      {/* Category Selector */}
-      <div style={{ display: 'flex', gap: '0.4rem', overflowX: 'auto', paddingBottom: '0.75rem', scrollbarWidth: 'none', marginBottom: '0.5rem' }}>
-        {LEADERBOARD_CATEGORIES.map((c, i) => (
-          <button key={c.key} onClick={() => setCatIdx(i)} style={{
-            padding: '0.35rem 0.75rem', borderRadius: '16px', whiteSpace: 'nowrap', fontSize: '0.78rem',
-            fontWeight: 600, cursor: 'pointer', border: 'none', flexShrink: 0, transition: 'all 0.2s',
-            background: catIdx === i ? 'var(--accent-color)' : 'rgba(255,255,255,0.06)',
-            color: catIdx === i ? 'white' : 'var(--text-secondary)',
-            boxShadow: catIdx === i ? '0 2px 10px var(--accent-glow)' : 'none',
-          }}>{c.label}</button>
-        ))}
-      </div>
-
-      {/* Ranking Rows */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-        {sorted.map((pr, idx) => {
-          const value = pr[cat.key];
-          const barWidth = Math.round((value / topValue) * 100);
-          const gap = idx === 0 ? null : sorted[0][cat.key] - value;
-          const isFirst = idx === 0;
-
-          return (
-            <div key={pr.name} style={{
-              background: isFirst
-                ? 'linear-gradient(135deg, var(--gold-bg), rgba(18,18,30,0.9))'
-                : 'var(--bg-card)',
-              border: `1px solid ${isFirst ? 'rgba(255,208,96,0.3)' : 'var(--border-card)'}`,
-              borderRadius: '14px',
-              padding: '0.85rem 1rem',
-              boxShadow: isFirst ? '0 4px 20px rgba(255,208,96,0.08)' : 'none',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                {/* Medal / Rank */}
-                <div style={{ width: '32px', textAlign: 'center', flexShrink: 0 }}>
-                  {idx < 3
-                    ? <span style={{ fontSize: '1.4rem' }}>{medals[idx]}</span>
-                    : <span style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-tertiary)' }}>#{idx + 1}</span>
-                  }
-                </div>
-
-                {/* Avatar */}
-                <div style={{
-                  width: '38px', height: '38px', borderRadius: '50%', flexShrink: 0,
-                  background: isFirst ? 'var(--gold)' : 'var(--accent-color)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '0.7rem', fontWeight: 800, color: isFirst ? '#000' : 'white',
-                  border: `2px solid ${isFirst ? 'rgba(255,208,96,0.6)' : 'rgba(124,58,237,0.4)'}`,
-                }}>{pr.avatar}</div>
-
-                {/* Name + Bar */}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.35rem' }}>
-                    <strong style={{ fontSize: '0.92rem', color: isFirst ? 'var(--gold)' : 'var(--text-primary)' }}>{pr.name}</strong>
-                    <strong style={{ fontSize: '1rem', color: isFirst ? 'var(--gold)' : medalColors[idx] || 'var(--text-secondary)' }}>{fmt(value)}</strong>
-                  </div>
-                  {/* Progress Bar */}
-                  <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: '6px', height: '6px', overflow: 'hidden' }}>
-                    <div style={{
-                      width: `${barWidth}%`, height: '100%', borderRadius: '6px',
-                      background: isFirst
-                        ? 'linear-gradient(90deg, var(--gold), #ff9500)'
-                        : `linear-gradient(90deg, var(--accent-color), var(--accent-light))`,
-                      transition: 'width 0.5s ease',
-                      boxShadow: isFirst ? '0 0 6px rgba(255,208,96,0.4)' : 'none',
-                    }}></div>
-                  </div>
-                  {/* Gap to first */}
-                  {gap !== null && (
-                    <p style={{ margin: '0.25rem 0 0', fontSize: '0.7rem', color: 'var(--text-tertiary)' }}>
-                      Distacco da 🥇: <span style={{ color: 'var(--error)' }}>- {fmt(gap)}</span>
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      
-      <EmergencyPanel />
-    </div>
-  );
-}
 
 export function DirectionAnalytics() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const { config } = useNox();
   const [activeTab, setActiveTab] = useState(0);
-  const [liveOrders, setLiveOrders] = useState([]);
-  const [stats, setStats] = useState({ entries: [], incidents: [], iceRequests: 0, cansSoldBottles: 0, cansSoldExtra: 0, sosAlerts: 0, uberCalls: 0, appAccesses: [], tableBookings: [] });
-
-  useEffect(() => {
-    const unsubOrders = streamOrders(setLiveOrders);
-    const unsubAnalytics = streamAnalytics(setStats);
-    return () => { unsubOrders(); unsubAnalytics(); };
-  }, []);
+  const { 
+    analytics: stats, 
+    orders: liveOrders, 
+    isInitialSyncDone 
+  } = useNoxStore();
 
   // Derive PR statistics from live orders
   const derivedPrData = liveOrders.reduce((acc, order) => {
@@ -233,56 +120,40 @@ export function DirectionAnalytics() {
 
           {/* Entry Types KPI */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-            {(() => {
-                const totalEntries = stats.entries.length || 1;
-                const normal = stats.entries.filter(e => e.type === 'normale').length;
-                const table = stats.entries.filter(e => e.type === 'tavolo').length;
-                return (
-                  <>
-                  <Card style={{ padding: '1rem' }}>
-                    <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', textTransform: 'uppercase', margin: '0 0 0.3rem' }}>Ingresso Normale</p>
-                    <strong style={{ fontSize: '1.2rem', color: 'var(--accent-light)' }}>{Math.round((normal/totalEntries)*100)}% <small style={{fontSize:'0.7rem', opacity:0.6}}>({normal})</small></strong>
-                  </Card>
-                  <Card style={{ padding: '1rem' }}>
-                    <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', textTransform: 'uppercase', margin: '0 0 0.3rem' }}>Ingresso Tavolo</p>
-                    <strong style={{ fontSize: '1.2rem', color: 'var(--warning)' }}>{Math.round((table/totalEntries)*100)}% <small style={{fontSize:'0.7rem', opacity:0.6}}>({table})</small></strong>
-                  </Card>
-                  </>
-                );
-            })()}
+            <Card style={{ padding: '1rem' }}>
+              <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', textTransform: 'uppercase', margin: '0 0 0.3rem' }}>Uomini (Males)</p>
+              <strong style={{ fontSize: '1.2rem', color: 'var(--accent-light)' }}>{stats.maleEntries || 0} <small style={{fontSize:'0.7rem', opacity:0.6}}>({Math.round((stats.maleEntries/(stats.totalEntries||1))*100)}%)</small></strong>
+            </Card>
+            <Card style={{ padding: '1rem' }}>
+              <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', textTransform: 'uppercase', margin: '0 0 0.3rem' }}>Donne (Females)</p>
+              <strong style={{ fontSize: '1.2rem', color: 'var(--warning)' }}>{stats.femaleEntries || 0} <small style={{fontSize:'0.7rem', opacity:0.6}}>({Math.round((stats.femaleEntries/(stats.totalEntries||1))*100)}%)</small></strong>
+            </Card>
           </div>
 
           {/* Gender Breakdown detailed */}
           <Card style={{ padding: '1.25rem' }}>
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Dettaglio Genere per Tipologia</p>
-              {['normale', 'tavolo'].map(type => {
-                  const items = stats.entries.filter(e => e.type === type);
-                  const total = items.length || 1;
-                  const m = items.filter(e => e.gender === 'U').length;
-                  const f = items.filter(e => e.gender === 'D').length;
-                  return (
-                    <div key={type} style={{ marginBottom: '1rem' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '0.3rem' }}>
-                            <span style={{ textTransform: 'capitalize' }}>{type === 'normale' ? 'Lista / Ingresso' : 'Tavoli'}</span>
-                            <span>{m} M / {f} F</span>
-                        </div>
-                        <div style={{ display: 'flex', height: '12px', borderRadius: '6px', overflow: 'hidden' }}>
-                            <div style={{ width: `${(m/total)*100}%`, background: '#3b82f6' }}></div>
-                            <div style={{ width: `${(f/total)*100}%`, background: '#ec4899' }}></div>
-                        </div>
-                    </div>
-                  );
-              })}
+              <p style={{ fontSize: '1rem', fontWeight: 800, marginBottom: '1rem' }}>Bilancio Pubblico</p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
+                  <span>Rapporto Genere</span>
+                  <span>{stats.maleEntries || 0} M / {stats.femaleEntries || 0} F</span>
+              </div>
+              <div style={{ display: 'flex', height: '16px', borderRadius: '8px', overflow: 'hidden', background: 'rgba(255,255,255,0.05)' }}>
+                  <div style={{ width: `${((stats.maleEntries || 0)/(stats.totalEntries || 1))*100}%`, background: '#3b82f6', transition: 'width 0.5s ease' }}></div>
+                  <div style={{ width: `${((stats.femaleEntries || 0)/(stats.totalEntries || 1))*100}%`, background: '#ec4899', transition: 'width 0.5s ease' }}></div>
+              </div>
+              <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '0.75rem', textAlign: 'center' }}>
+                Totale Presenze: <strong>{stats.totalEntries || 0} persone</strong>
+              </p>
           </Card>
 
           {/* App Conversion */}
           <Card style={{ padding: '1.25rem', borderLeft: '4px solid var(--accent-glow)' }}>
               <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Conversione App &rarr; Tavolo</p>
               {(() => {
-                  const uniqueAccess = new Set(stats.appAccesses.map(a => a.userId)).size;
-                  const bookings = stats.tableBookings.length;
-                  const totalBottles = stats.tableBookings.reduce((s, b) => s + b.bottles, 0);
-                  const totalPeople = stats.tableBookings.reduce((s, b) => s + b.people, 0);
+                  const uniqueAccess = new Set((stats.appAccesses || []).map(a => a.userId)).size;
+                  const bookings = (stats.tableBookings || []).length || 0;
+                  const totalBottles = (stats.tableBookings || []).reduce((s, b) => s + (b.bottles || 0), 0);
+                  const totalPeople = (stats.tableBookings || []).reduce((s, b) => s + (b.people || 0), 0);
                   return (
                     <div style={{ marginTop: '0.5rem' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -308,37 +179,13 @@ export function DirectionAnalytics() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                     <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: 0 }}>Incidenti e Risse</p>
-                    <strong style={{ fontSize: '1.5rem', color: 'var(--error)' }}>{stats.incidents.length} segnalati</strong>
+                    <strong style={{ fontSize: '1.5rem', color: 'var(--error)' }}>{(stats.incidents || []).length} segnalati</strong>
                 </div>
                 <AlertCircle size={32} color="var(--error)" />
             </div>
           </Card>
 
-          {/* Logistics Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-            <Card style={{ padding: '1rem' }}>
-                <Snowflake size={18} color="var(--accent-light)" style={{ marginBottom: '0.5rem' }} />
-                <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: 0 }}>Richieste Ghiaccio</p>
-                <strong style={{ fontSize: '1.2rem' }}>{stats.iceRequests}</strong>
-            </Card>
-            <Card style={{ padding: '1rem' }}>
-                <Package size={18} color="var(--warning)" style={{ marginBottom: '0.5rem' }} />
-                <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: 0 }}>Lattine Complessive</p>
-                <strong style={{ fontSize: '1.2rem' }}>{stats.cansSoldBottles + stats.cansSoldExtra}</strong>
-            </Card>
-          </div>
-
-          {/* Cans Breakdown */}
-          <Accordion title="Dettaglio Lattine" icon={<Package size={15} />} borderColor="var(--warning)" defaultOpen={true}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0' }}>
-                  <span style={{ fontSize: '0.85rem' }}>Lattine con Bottiglie</span>
-                  <strong style={{ color: 'var(--success)' }}>{stats.cansSoldBottles}</strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0' }}>
-                  <span style={{ fontSize: '0.85rem' }}>Lattine Ordinazioni Extra</span>
-                  <strong style={{ color: 'var(--warning)' }}>{stats.cansSoldExtra}</strong>
-              </div>
-          </Accordion>
+          {/* Emergency Services */}
 
           {/* Emergency Services */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
@@ -361,10 +208,9 @@ export function DirectionAnalytics() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <Accordion title="Economia Bottiglie" icon={<Wine size={15} />} defaultOpen={true} borderColor="var(--warning)">
             {[
-              { label: 'Prenotate (Pre-Serata)', value: '45', sub: '€ 8.500', color: 'var(--text-primary)' },
-              { label: 'Extra Live (Upsell In-App)', value: '18', sub: '€ 3.200', color: 'var(--accent-light)' },
-              { label: 'Consegnate (QR Validato)', value: '60 / 63', sub: '95% delivery rate', color: 'var(--success)' },
-              { label: 'Non Evase / Annullate', value: '3', sub: '- € 450', color: 'var(--error)' },
+              { label: 'Tavoli Totali (Live)', value: liveOrders.length, sub: 'In-App Orders', color: 'var(--text-primary)' },
+              { label: 'Fatturato Tavoli', value: `€ ${stats.tableRevenue || 0}`, sub: 'Validati', color: 'var(--success)' },
+              { label: 'Media Spesa per Tavolo', value: `€ ${liveOrders.length > 0 ? Math.round(stats.tableRevenue / liveOrders.length) : 0}`, sub: 'Effettiva', color: 'var(--accent-light)' },
             ].map(({ label, value, sub, color }) => (
               <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.65rem', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', marginBottom: '0.5rem' }}>
                 <span style={{ fontSize: '0.85rem' }}>{label}</span>
@@ -402,9 +248,25 @@ export function DirectionAnalytics() {
             ].map(([name, count, color], i) => (
               <div key={name} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0', borderBottom: '1px solid var(--border-card)', alignItems: 'center' }}>
                 <span style={{ fontSize: '0.85rem' }}>{i + 1}. {name}</span>
-                <strong style={{ color }}>{count} lattine</strong>
+                <strong style={{ color }}>{count} pz</strong>
               </div>
             ))}
+          </Accordion>
+
+          {/* New Lattine Section moved from Logistics */}
+          <Accordion title="Volume Complessivo Lattine" icon={<Package size={15} />} borderColor="var(--warning)" defaultOpen={true}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0' }}>
+                  <span style={{ fontSize: '0.85rem' }}>Lattine con Bottiglie</span>
+                  <strong style={{ color: 'var(--success)' }}>{stats.cansSoldBottles}</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0' }}>
+                  <span style={{ fontSize: '0.85rem' }}>Lattine Ordinazioni Extra</span>
+                  <strong style={{ color: 'var(--warning)' }}>{stats.cansSoldExtra}</strong>
+              </div>
+              <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ fontWeight: 700 }}>TOTALE LATTINE</span>
+                  <strong style={{ color: 'var(--warning)' }}>{stats.cansSoldBottles + stats.cansSoldExtra}</strong>
+              </div>
           </Accordion>
         </div>
       )}

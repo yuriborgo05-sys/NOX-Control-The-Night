@@ -64,3 +64,19 @@ export function playCoinSound() {
   playTone({ frequency: 1200, duration: 0.06, type: 'sine', volume: 0.2 });
   playTone({ frequency: 1600, duration: 0.08, type: 'sine', volume: 0.2, delay: 0.07 });
 }
+
+/** New order notification — Standard staff ping */
+export function playNotificationSound() {
+  playTone({ frequency: 880, duration: 0.1, type: 'sine', volume: 0.2 });
+  playTone({ frequency: 1320, duration: 0.15, type: 'sine', volume: 0.2, delay: 0.08 });
+}
+
+/** Urgent VIP alarm — High-value order (€1000+) */
+export function playVIPAlertSound() {
+  // Urgent tri-tone sequence
+  playTone({ frequency: 1046, duration: 0.15, type: 'square', volume: 0.2 });
+  playTone({ frequency: 880, duration: 0.15, type: 'square', volume: 0.2, delay: 0.16 });
+  playTone({ frequency: 1046, duration: 0.25, type: 'square', volume: 0.25, delay: 0.32 });
+  // Repeat for urgency
+  playTone({ frequency: 1046, duration: 0.15, type: 'square', volume: 0.15, delay: 0.6 });
+}

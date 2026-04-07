@@ -1,0 +1,14 @@
+node_modules
+dist
+.git
+.vercel
+build.log
+build_error*
+deploy_final.txt
+deploy_log.txt
+list_files.txt
+node_modules_old
+walkthrough.md
+recovery_plan.md
+task.md
+implementation_plan.md

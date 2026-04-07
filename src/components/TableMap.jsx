@@ -2,7 +2,7 @@ import React from 'react';
 import { noxTables, dancefloorTables, consoleTables, priveTables, VENUE_ZONES, getZoneById } from '../data/noxData';
 
 /**
- * VenueTableMap — Complete real venue layout for TOO MUCH / NOX Club
+ * VenueTableMap — Complete real venue layout for NOX - Control The Night
  * 
  * Includes:
  *  - Dance Floor tables (original layout)

@@ -80,20 +80,9 @@ export function CustomerProfile() {
              </div>
           </div>
 
-          {/* Unique QR Code appearing only when Ready For Delivery */}
-          {bottleState === 'in consegna' && (
-             <div style={{ background: 'linear-gradient(to top, rgba(16, 185, 129, 0.2), transparent)', padding: '1.5rem', borderRadius: '16px', border: '1px solid var(--success)', textAlign: 'center', animation: 'fadeIn 0.3s ease' }}>
-                <div style={{ background: 'white', padding: '1rem', borderRadius: '12px', display: 'inline-block', marginBottom: '1rem' }}>
-                   <QrCode size={120} color="black" />
-                </div>
-                <h4 style={{ color: 'var(--success)', marginBottom: '0.25rem' }}>QR Univoco Bottiglia</h4>
-                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Mostra questo QR al cameriere per confermare l'identità e sbloccare la consegna fisica al tuo tavolo. Mai riutilizzabile.</p>
-             </div>
-          )}
-
           {bottleState === 'QR Validato (Chiusa)' && (
              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', color: 'gray', marginTop: '1rem' }}>
-                <CheckCircle2 size={16} /> <span>Consegna Validata dal Cameriere. Chiuso.</span>
+                <CheckCircle2 size={16} /> <span>Consegna Completata dal Cameriere. Chiuso.</span>
              </div>
           )}
           

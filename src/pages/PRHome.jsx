@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { streamPrStats, streamOrders } from '../services/db';
+import { streamPrStats, streamOrders, recordServiceCall } from '../services/db';
 import { useAuth } from '../context/AuthContext';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
-import { LogOut, Users, Trophy, Wine, ArrowUp, Zap, IceCream, CupSoda, CheckCircle2, Map } from 'lucide-react';
+import { NoxIcon } from '../components/NoxIcon';
 import { useNavigate } from 'react-router-dom';
 import { EmergencyPanel } from '../components/EmergencyPanel';
 import { ManualTableCreate } from '../components/ManualTableCreate';
 import { useNox } from '../context/NoxContext';
+import { useNotification } from '../context/NotificationContext';
+import { useRef } from 'react';
+import { playNotificationSound } from '../utils/audio';
 
 export function PRHome() {
   const { user, logout } = useAuth();
@@ -18,13 +21,57 @@ export function PRHome() {
   const [lbCategory, setLbCategory] = useState('fatturato');
   const [lbPeriod, setLbPeriod] = useState('serata');
   const [reqSent, setReqSent] = useState(null);
+  const { addNotification } = useNotification();
+  
+  const prevStatuses = useRef({});
+  const prevEntries = useRef({}); 
+  const isFirstLoadOrders = useRef(true);
 
   useEffect(() => {
     if (user?.id) {
       const unsubStats = streamPrStats(user.id, (data) => {
         if (data) setLivePrData(data);
       });
-      const unsubOrders = streamOrders(setAllOrders);
+      const unsubOrders = streamOrders((orders) => {
+        setAllOrders(orders);
+        
+        // PR Notification Logic: Notify when THEIR tables' orders change status
+        if (!isFirstLoadOrders.current) {
+          orders.forEach(order => {
+            const isMyOrder = order.pr === user?.name || order.prAssigned === user?.name;
+            if (isMyOrder) {
+              const prevStatus = prevStatuses.current[order.id];
+              if (prevStatus && prevStatus !== order.status) {
+                let msg = "";
+                if (order.status === 'preparing') msg = `Ordine Tavolo ${order.table} in preparazione.`;
+                if (order.status === 'ready') msg = `🔥 Ordine Tavolo ${order.table} PRONTO al ritiro!`;
+                if (order.status === 'delivered') msg = `Ordine Tavolo ${order.table} consegnato con successo.`;
+                
+                if (msg) {
+                  addNotification("Aggiornamento Tavolo", msg, "info");
+                  playNotificationSound();
+                }
+              }
+              
+              // NEW Entry Detection
+              const wasEntered = prevEntries.current[order.id];
+              if (order.isEntered && !wasEntered) {
+                addNotification("🛬 Arrivo Ospiti", `Il tuo tavolo ${order.table} (${order.pax} persone) è appena entrato!`, "success");
+                playNotificationSound();
+              }
+
+              prevStatuses.current[order.id] = order.status;
+              prevEntries.current[order.id] = order.isEntered;
+            }
+          });
+        } else {
+          orders.forEach(o => { 
+            prevStatuses.current[o.id] = o.status; 
+            prevEntries.current[o.id] = o.isEntered;
+          });
+          isFirstLoadOrders.current = false;
+        }
+      });
       return () => { unsubStats(); unsubOrders(); };
     }
   }, [user]);
@@ -56,8 +103,14 @@ export function PRHome() {
 
   const currentLB = deriveRankable(lbCategory === 'media_spesa' ? 'fatturato' : lbCategory); // Simplified for now
 
-  const handleRunReq = (type) => {
+  const handleRunReq = async (type) => {
       setReqSent(type);
+      try {
+          // Usa il db reale per far arrivare la chiamata allo staff/cambusa
+          await recordServiceCall('assistenza_pr', { prName: user?.name, request: type, table: `PR ${user?.name || ''}`.trim() });
+      } catch (err) {
+          console.error("Errore invio richiesta:", err);
+      }
       setTimeout(() => setReqSent(null), 3500);
   }
 
@@ -182,7 +235,7 @@ export function PRHome() {
             </div>
         </div>
         <button onClick={() => { logout(); navigate('/login'); }} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '0.6rem 1rem', borderRadius: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700, fontSize: '0.8rem' }}>
-          <LogOut size={16} /> ESCI
+          <NoxIcon name="log-out" size={16} /> ESCI
         </button>
       </header>
 
@@ -191,7 +244,7 @@ export function PRHome() {
         <Card style={{ padding: '1rem', borderTop: '3px solid var(--accent-color)', background: 'rgba(94, 92, 230, 0.05)' }}>
           <h4 style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Incasso Serata</h4>
           <p style={{ fontSize: '1.6rem', fontWeight: 900, color: 'white', margin: '0.2rem 0' }}>€ {livePrData.revenue}</p>
-          <span style={{ fontSize: '0.65rem', color: 'var(--success)', display: 'flex', alignItems: 'center', gap: '2px' }}><ArrowUp size={10}/> Fatturato OK</span>
+          <span style={{ fontSize: '0.65rem', color: 'var(--success)', display: 'flex', alignItems: 'center', gap: '2px' }}><NoxIcon name="arrow-up" size={10}/> Fatturato OK</span>
         </Card>
         <Card style={{ padding: '1rem', borderTop: '3px solid var(--warning)', background: 'rgba(255, 159, 10, 0.05)' }}>
           <h4 style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Bott. Serata</h4>
@@ -203,7 +256,7 @@ export function PRHome() {
       {/* LIVE TOP 3 DASHBOARD (Nuova Funzione) */}
       <Card style={{ padding: '1.25rem 1rem', background: 'rgba(0,0,0,0.3)', borderColor: 'var(--success)' }}>
           <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.1rem', margin: '0 0 1rem 0', color: 'white' }}>
-            <Trophy size={20} color="var(--success)" /> Live Top 3 Tables
+            <NoxIcon name="trophy" size={20} color="var(--success)" /> Live Top 3 Tables
           </h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
              {Object.entries(allOrders.reduce((acc, o) => {
@@ -240,7 +293,7 @@ export function PRHome() {
       {/* RECENT ORDERS FEED WITH GIFT MESSAGES */}
       <Card style={{ padding: '1.25rem 1rem', background: 'rgba(0,0,0,0.2)' }}>
           <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.1rem', margin: '0 0 1rem 0', color: 'white' }}>
-            <Wine size={20} color="var(--accent-light)" /> Ultimi Ordini
+            <NoxIcon name="wine" size={20} color="var(--accent-light)" /> Ultimi Ordini
           </h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
              {allOrders.slice(0, 5).map(order => (
@@ -272,10 +325,10 @@ export function PRHome() {
       <ManualTableCreate prName={user?.name || 'PR'} />
 
       {/* MAPPA TAVOLI */}
-      <Card style={{ padding: '1rem', cursor: 'pointer', borderColor: 'var(--accent-color)' }} onClick={() => navigate('/reservation')}>
+      <Card style={{ padding: '1rem', cursor: 'pointer', borderColor: 'var(--accent-color)' }} onClick={() => navigate('/reserve')}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <Map size={22} color="var(--accent-color)" />
+            <NoxIcon name="map" size={22} color="var(--accent-color)" />
             <div>
               <h4 style={{ margin: 0, fontSize: '0.95rem' }}>Mappa Tavoli</h4>
               <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Vedi disposizione, stato e disponibilità</p>
@@ -286,14 +339,14 @@ export function PRHome() {
 
       {/* RICHIESTE RAPIDE */}
       <Card style={{ padding: '1.25rem 1rem' }}>
-        <h3 style={{ marginBottom: '1rem', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Zap size={18} color="var(--warning)"/> Richieste Rapide</h3>
+        <h3 style={{ marginBottom: '1rem', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}><NoxIcon name="zap" size={18} color="var(--warning)"/> Richieste Rapide</h3>
         {!reqSent ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
               <div style={{ display: 'flex', gap: '0.75rem' }}>
-                <Button variant="secondary" onClick={() => handleRunReq('Ghiaccio')} style={{ flex: 1, padding: '0.75rem', display: 'flex', justifyContent: 'center', gap: '0.4rem', borderColor: 'rgba(255,255,255,0.1)' }}><IceCream size={16}/> Ghiaccio</Button>
+                <Button variant="secondary" onClick={() => handleRunReq('Ghiaccio')} style={{ flex: 1, padding: '0.75rem', display: 'flex', justifyContent: 'center', gap: '0.4rem', borderColor: 'rgba(255,255,255,0.1)' }}><NoxIcon name="ice-cream" size={16}/> Ghiaccio</Button>
               </div>
               <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.75rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                <p style={{ margin: '0 0 0.5rem', fontSize: '0.8rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem' }}><CupSoda size={14}/> Analcolici</p>
+                <p style={{ margin: '0 0 0.5rem', fontSize: '0.8rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem' }}><NoxIcon name="cup-soda" size={14}/> Analcolici</p>
                 <select className="input-base" style={{ marginBottom: '0.6rem', color: 'black' }} id="pr-drink-select">
                   <option value="" disabled style={{color:'black'}}>Seleziona bevanda...</option>
                   <option value="Coca Cola" style={{color:'black'}}>Coca Cola — € 5</option>
@@ -310,7 +363,7 @@ export function PRHome() {
             </div>
         ) : (
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem', color: 'var(--success)', padding: '0.5rem', background: 'rgba(16,185,129,0.1)', borderRadius: '8px' }}>
-                <CheckCircle2 size={18} /> Richiesta {reqSent} Inviata!
+                <NoxIcon name="check-circle-2" size={18} /> Richiesta {reqSent} Inviata!
             </div>
         )}
       </Card>
@@ -319,7 +372,7 @@ export function PRHome() {
       <Card style={{ padding: '0', overflow: 'hidden' }}>
         <div style={{ padding: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.1rem', margin: 0, color: 'white' }}>
-              <Trophy size={20} color="gold" /> Classifica Staff
+              <NoxIcon name="trophy" size={20} color="gold" /> Classifica Staff
             </h3>
             <button onClick={downloadCSV} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-secondary)', padding: '0.4rem 0.8rem', borderRadius: '8px', fontSize: '0.7rem', cursor: 'pointer' }}>
                Scarica CSV

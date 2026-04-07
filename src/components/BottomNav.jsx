@@ -11,7 +11,7 @@ export function BottomNav() {
   
   if (!user || user.role !== 'cliente') return null;
   // Solo visualizzato nelle route principali del cliente, scompare in checkout ecc per focus
-  const showNavPaths = ['/customer', '/catalog', '/reservation', '/profile'];
+  const showNavPaths = ['/customer', '/catalog', '/reserve', '/profile'];
   if (!showNavPaths.includes(location.pathname)) return null;
 
   const tabs = [

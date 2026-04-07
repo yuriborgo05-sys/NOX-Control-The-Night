@@ -5,11 +5,17 @@ import { Card } from '../components/Card';
 import { Button } from '../components/Button';
 import { Accordion } from '../components/Accordion';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, Bell, CheckCircle2, AlertTriangle, Coins, RefreshCw, IceCream, Trash2, Package } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { EmergencyPanel } from '../components/EmergencyPanel';
-import { playCheckInSound } from '../utils/audio';
+import { playCheckInSound, playNotificationSound } from '../utils/audio';
 import { hapticSoftPop } from '../utils/haptics';
+import { useNotification } from '../context/NotificationContext';
+import { useRef } from 'react';
+import { speak, enableSpeech } from '../utils/speech';
+import { 
+  Volume2, VolumeX, LogOut, Bell, CheckCircle2, 
+  AlertTriangle, Coins, RefreshCw, IceCream, Trash2, Package 
+} from 'lucide-react';
 
 export function WaiterHome() {
   const { user, logout } = useAuth();
@@ -18,13 +24,35 @@ export function WaiterHome() {
   const [serviceCalls, setServiceCalls] = useState([]);
   const [cashOrders, setCashOrders] = useState([]);
   const [waiterOrders, setWaiterOrders] = useState([]);
+  const [voiceEnabled, setVoiceEnabled] = useState(false);
+  const { addNotification } = useNotification();
+  
+  const prevWaiterCount = useRef(0);
+  const prevCallsCount = useRef(0);
+  const isFirstLoad = useRef(true);
 
   useEffect(() => {
-    const unsub1 = streamServiceCalls(setServiceCalls);
+    const unsub1 = streamServiceCalls((data) => {
+      if (!isFirstLoad.current && data.length > prevCallsCount.current) {
+        if (voiceEnabled) speak(`Chiamata di servizio al tavolo ${data[0].table || 'Sconosciuto'}`);
+        addNotification('Richiesta Servizio', `Il tavolo ${data[0].table} sta chiamando!`, 'warning');
+      }
+      setServiceCalls(data);
+      prevCallsCount.current = data.length;
+    });
     const unsub2 = streamCashOrders(setCashOrders);
-    const unsub3 = streamWaiterOrders(setWaiterOrders);
+    const unsub3 = streamWaiterOrders((data) => {
+      if (!isFirstLoad.current && data.length > prevWaiterCount.current) {
+        if (voiceEnabled) speak(`Ritira ordine al tavolo ${data[0].table || 'Sconosciuto'}`);
+        addNotification('Ritiro Pronto', 'Un ordine è pronto in Cambusa. Vai subito al banco!', 'info');
+        playNotificationSound();
+      }
+      setWaiterOrders(data);
+      prevWaiterCount.current = data.length;
+      isFirstLoad.current = false;
+    });
     return () => { unsub1(); unsub2(); unsub3(); };
-  }, []);
+  }, [voiceEnabled]);
 
   const completeService = async (id) => {
     hapticSoftPop();
@@ -64,10 +92,27 @@ export function WaiterHome() {
                 <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', margin: 0 }}>{user?.name}</p>
             </div>
         </div>
-        <button onClick={() => { logout(); navigate('/login'); }} style={{ background: 'rgba(255,69,58,0.1)', border: 'none', color: '#ff453a', padding: '0.6rem', borderRadius: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-          <LogOut size={18} />
-          <span style={{ fontSize: '0.75rem', fontWeight: 700 }}>ESCI</span>
-        </button>
+        <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+          <button 
+            onClick={() => {
+              if (!voiceEnabled) enableSpeech();
+              setVoiceEnabled(!voiceEnabled);
+            }}
+            style={{ 
+              background: voiceEnabled ? 'rgba(0,180,255,0.1)' : 'rgba(255,255,255,0.05)', 
+              border: 'none', color: voiceEnabled ? '#1e90ff' : 'gray', 
+              padding: '0.5rem', borderRadius: '10px', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.7rem', fontWeight: 700
+            }}
+          >
+            {voiceEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
+            {voiceEnabled ? 'VOCE ON' : 'VOCE OFF'}
+          </button>
+          <button onClick={() => { logout(); navigate('/login'); }} style={{ background: 'rgba(255,69,58,0.1)', border: 'none', color: '#ff453a', padding: '0.6rem', borderRadius: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <LogOut size={18} />
+            <span style={{ fontSize: '0.75rem', fontWeight: 700 }}>ESCI</span>
+          </button>
+        </div>
       </header>
 
       {/* ─── HERO ACTIONS ─── */}

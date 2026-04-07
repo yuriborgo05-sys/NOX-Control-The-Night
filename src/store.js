@@ -12,6 +12,33 @@ export const useNoxStore = create(
       userTable: null,
       prAssigned: 'Nessuno',
 
+      // --- Operational Store (REAL TIME) ---
+      orders: [],
+      serviceCalls: [],
+      staffMessages: [],
+      analytics: {
+        tableRevenue: 0,
+        totalEntries: 0,
+        maleEntries: 0,
+        femaleEntries: 0,
+        tableBookings: [],
+        appAccesses: [],
+        incidents: [],
+        sosAlerts: 0,
+        uberCalls: 0,
+        cansSoldBottles: 0,
+        cansSoldExtra: 0,
+        lastUpdate: null
+      },
+      emergencyAlerts: [],
+
+      // --- Sync Actions ---
+      setOrders: (orders) => set({ orders }),
+      setServiceCalls: (serviceCalls) => set({ serviceCalls }),
+      setStaffMessages: (staffMessages) => set({ staffMessages }),
+      setAnalytics: (analytics) => set({ analytics }),
+      setEmergencyAlerts: (emergencyAlerts) => set({ emergencyAlerts }),
+
       // --- Actions Customer ---
       setCustomerEntry: (table, pr) =>
         set({
@@ -40,7 +67,9 @@ export const useNoxStore = create(
 
       // --- Network / Offline State ---
       isOffline: false,
+      isInitialSyncDone: false,
       setOfflineStatus: (status) => set({ isOffline: status }),
+      setInitialSyncDone: (status) => set({ isInitialSyncDone: status }),
 
       // --- System Config ---
       emergencyMode: false,
@@ -51,6 +80,8 @@ export const useNoxStore = create(
         entryTime: null,
         liveDuration: 0,
         userTable: null,
+        orders: [],
+        serviceCalls: []
       })
     }),
     {
@@ -59,8 +90,9 @@ export const useNoxStore = create(
       partialize: (state) => ({ 
         hasEntered: state.hasEntered, 
         entryTime: state.entryTime, 
-        userTable: state.userTable 
-      }), // Persiste solo questi campi tra un riavvio e l'altro
+        userTable: state.userTable,
+        prAssigned: state.prAssigned 
+      }), // Persiste solo l'essenziale tra i riavvii
     }
   )
 );

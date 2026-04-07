@@ -20,17 +20,15 @@ const db = getFirestore(app);
 // Enable Offline Persistence for Club Environment
 // Se la rete cade temporaneamente (cantina, privè), 
 // le scritture in cache verranno sincronizzate non appena torna la rete.
-if (import.meta.env.PROD) {
-  try {
-    enableIndexedDbPersistence(db).catch((err) => {
-      if (err.code === 'failed-precondition') {
-         console.warn("Multiple tabs open, offline DB limited to one tab");
-      } else if (err.code === 'unimplemented') {
-         console.warn("Browser doesn't support offline DB persistence");
-      }
-    });
-  } catch(e) { console.error("Persistence failed:", e); }
-}
+try {
+  enableIndexedDbPersistence(db).catch((err) => {
+    if (err.code === 'failed-precondition') {
+       console.warn("Multiple tabs open, offline DB limited to one tab");
+    } else if (err.code === 'unimplemented') {
+       console.warn("Browser doesn't support offline DB persistence");
+    }
+  });
+} catch(e) { console.error("Persistence failed:", e); }
 
 // Log di Avvertimento se manca il file .env per non spaventare il Developer
 if(firebaseConfig.apiKey.includes('MOCK_KEY')) {

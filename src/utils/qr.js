@@ -1,25 +1,30 @@
-// Dynamic QR Engine (Build-Safe Version)
-// We avoid btoa() to prevent Rollup binding issues in some environments.
+/**
+ * 🔐 NOX Ephemeral QR Engine
+ * Generates time-sensitive tokens for secure Entry/Exit validation.
+ * Format: Base64(orderId:timestamp)
+ */
 
-const simpleHash = (str) => {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-        const char = str.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash = hash & hash; // Convert to 32bit integer
-    }
-    return Math.abs(hash).toString(36).toUpperCase();
+export const encodeSessionToken = (orderId) => {
+  if (!orderId) return '';
+  const now = Date.now();
+  // We use btoa for a simple but effective masking of the timestamp
+  // In a professional environment, this would be signed with a secret key
+  return btoa(`${orderId}:${now}`);
 };
 
-export const generateDynamicToken = (baseId) => {
-    const timeWindow = Math.floor(Date.now() / 60000); // 1-minute window
-    return `BMB-${simpleHash(`${baseId}-${timeWindow}`)}`.slice(0, 12);
+export const decodeSessionToken = (token) => {
+  try {
+    const decoded = atob(token);
+    const [orderId, timestamp] = decoded.split(':');
+    return { 
+      orderId, 
+      timestamp: parseInt(timestamp),
+      isValidFormat: !!(orderId && timestamp)
+    };
+  } catch (e) {
+    return { isValidFormat: false };
+  }
 };
 
-export const validateDynamicToken = (token, baseId) => {
-    const timeWindow = Math.floor(Date.now() / 60000);
-    const expectedCurrent = `BMB-${simpleHash(`${baseId}-${timeWindow}`)}`.slice(0, 12);
-    const expectedPrev = `BMB-${simpleHash(`${baseId}-${timeWindow - 1}`)}`.slice(0, 12);
-    
-    return token === expectedCurrent || token === expectedPrev;
-};
+// Legacy support for other parts of the app if needed
+export const generateDynamicToken = (baseId) => encodeSessionToken(baseId);
